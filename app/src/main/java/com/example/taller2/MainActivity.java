@@ -2,7 +2,9 @@ package com.example.taller2;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.ImageButton;
 
 public class MainActivity extends AppCompatActivity {
@@ -20,5 +22,17 @@ public class MainActivity extends AppCompatActivity {
         camera = findViewById(R.id.camera);
         contacts = findViewById(R.id.contacts);
         location = findViewById(R.id.location);
+
+        contacts.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(getBaseContext(),ContactsActivity.class));
+            }
+        });
     }
+
+
+
+    void location (View view){};
+    void camara (View view){};
 }
