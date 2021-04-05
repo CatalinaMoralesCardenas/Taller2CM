@@ -11,9 +11,15 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.api.ApiException;
@@ -32,12 +38,16 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.example.taller2.databinding.ActivityMapsBinding;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+
+import java.io.IOException;
+import java.util.List;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -53,12 +63,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     //Settings
     private static final int SETTINGS_GPS = 20;
 
+    //views
+    EditText address;
+    //Geocoder
+    Geocoder geocoder;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         binding = ActivityMapsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -67,30 +83,67 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         locationRequest = createLocationRequest();
         clientLocation = LocationServices.getFusedLocationProviderClient(this);
-        locationCallback =  new LocationCallback() {
+        locationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(@NonNull LocationResult locationResult) {
                 super.onLocationResult(locationResult);
                 Location location = locationResult.getLastLocation();
-                if(location != null){
+                if (location != null) {
                     Log.i(" LOCATION ", "Longitud: " + location.getLongitude());
                     Log.i(" LOCATION ", "Latitud: " + location.getLatitude());
 
-                    LatLng bogota = new LatLng(location.getLatitude(),location.getLongitude());
-                    mMap.addMarker(new MarkerOptions().position(bogota).title("Tu Ubicación"));
-                    mMap.moveCamera(CameraUpdateFactory.newLatLng(bogota));
+                    LatLng userLocation = new LatLng(location.getLatitude(), location.getLongitude());
+                    mMap.addMarker(new MarkerOptions().position(userLocation).title("Tu Ubicación"));
+                    mMap.moveCamera(CameraUpdateFactory.newLatLng(userLocation));
                     mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
 
                 }
 
             }
+
         };
+
         requestPermission(this, permLocation, "Needed", LOCATION_PERMISSION_ID);
         initView();
+
+        geocoder = new Geocoder(this);
+        address = findViewById(R.id.busqueda);
+        address.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                if (actionId == EditorInfo.IME_ACTION_SEND) {
+                    String direccion = address.getText().toString();
+                    if (!direccion.isEmpty()) {
+                        try {
+                            List<Address> addresses = geocoder.getFromLocationName(direccion, 2);
+                            if (addresses != null && !addresses.isEmpty()) {
+                                Address addressResult = addresses.get(0);
+                                if (mMap != null) {
+                                    LatLng location = new LatLng(addressResult.getLatitude(), addressResult.getLongitude());
+                                    mMap.addMarker(new MarkerOptions().
+                                            position(location).
+                                            title(addressResult.getAddressLine(0)).
+                                            icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)));
+                                    mMap.moveCamera(CameraUpdateFactory.newLatLng(location));
+                                    mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
+
+                                }
+                            } else {
+                                Toast.makeText(v.getContext(), "Dirección No Encontrada", Toast.LENGTH_SHORT).show();
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                return false;
+            }
+        });
+
     }
 
-    private void initView(){
-        if(ContextCompat.checkSelfPermission(this, permLocation)== PackageManager.PERMISSION_GRANTED) {
+    private void initView() {
+        if (ContextCompat.checkSelfPermission(this, permLocation) == PackageManager.PERMISSION_GRANTED) {
             checkSettingsLocation();
         }
     }
@@ -100,13 +153,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
         mMap.getUiSettings().setZoomGesturesEnabled(true);
         mMap.getUiSettings().setZoomControlsEnabled(true);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        mMap.getUiSettings().setMyLocationButtonEnabled(true);
+        mMap.setMyLocationEnabled(true);
 
     }
 
     private LocationRequest createLocationRequest() {
         LocationRequest locationRequest = new LocationRequest();
-        locationRequest.setInterval(10000);
-        locationRequest.setFastestInterval(5000);
+        locationRequest.setInterval(300000);
+        locationRequest.setFastestInterval(200000);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         return locationRequest;
 
