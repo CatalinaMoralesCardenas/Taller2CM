@@ -1,16 +1,23 @@
 package com.example.taller2;
 
+import com.example.taller2.adapters.GetDirectionsData;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
 
+import com.directions.route.AbstractRouting;
+import com.directions.route.Route;
+import com.directions.route.RouteException;
+import com.directions.route.Routing;
+import com.directions.route.RoutingListener;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
 import android.hardware.Sensor;
@@ -21,13 +28,16 @@ import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.CommonStatusCodes;
+import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -38,6 +48,7 @@ import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.SettingsClient;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -48,14 +59,18 @@ import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.example.taller2.databinding.ActivityMapsBinding;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.android.material.snackbar.Snackbar;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.OnConnectionFailedListener, RoutingListener {
 
     private GoogleMap mMap;
     private ActivityMapsBinding binding;
@@ -81,6 +96,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     EditText address;
     //Geocoder
     Geocoder geocoder;
+
+    //polyline object
+    private List<Polyline> polylines=null;
+    private List<LatLng> latLngList = new ArrayList<>();
+    Polyline polyline;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -152,6 +172,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     Double longitude2 = locationM.getPosition().longitude;
                                     Toast.makeText(MapsActivity.this, "La distancia es: " + distance(latitude1, longitude1, latitude2, longitude2) + " Km", Toast.LENGTH_SHORT).show();
 
+                                    Findroutes(locationM.getPosition(),searchM.getPosition());
+
+                                    /*getUrl();
+                                      latLngList.add(locationM.getPosition());
+                                      latLngList.add(searchM.getPosition());
+
+                                      if(polyline != null) polyline.remove();
+                                      PolylineOptions polylineOptions = new PolylineOptions().addAll(latLngList).clickable(true);
+                                      polyline = mMap.addPolyline(polylineOptions);
+                                      latLngList.clear();*/
                                 }
                             } else {
                                 Toast.makeText(v.getContext(), "Dirección No Encontrada", Toast.LENGTH_SHORT).show();
@@ -225,6 +255,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 Double longitude1 = searchM.getPosition().longitude;
                 Double longitude2 = locationM.getPosition().longitude;
                 Toast.makeText(MapsActivity.this, "La distancia es: " + distance(latitude1, longitude1, latitude2, longitude2) + " Km", Toast.LENGTH_SHORT).show();
+
+                Findroutes(locationM.getPosition(),searchM.getPosition());
+
+              /*getUrl();
+                latLngList.add(locationM.getPosition());
+                latLngList.add(searchM.getPosition());
+
+                if(polyline != null) polyline.remove();
+                PolylineOptions polylineOptions = new PolylineOptions().addAll(latLngList).clickable(true);
+                polyline = mMap.addPolyline(polylineOptions);
+                latLngList.clear();*/
             }
         });
     }
@@ -340,5 +381,126 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         double result = 6371 * c;
         return Math.round(result*100.0)/100.0;
+    }
+
+    public void getUrl(){
+        StringBuilder sb;
+        Object[] dataTransfer = new Object[4];
+
+        sb = new StringBuilder();
+
+        sb.append("https://maps.googleapis.com/maps/api/directions/json?");
+
+        String str_origin = "origin=" + locationM.getPosition().latitude + "," + locationM.getPosition().longitude;
+
+        sb.append(str_origin);
+
+        String str_dest = "&destination=" + searchM.getPosition().latitude + "," + searchM.getPosition().longitude;
+        sb.append(str_dest);
+
+        sb.append("&mode=driving&key=AIzaSyBQO-l2zw_iDe6mbG1HpKPLlOuIYhWRGsY");//+ getString(R.string.google_maps_key));
+
+        System.out.println("locación ---------------------" + sb);
+
+        GetDirectionsData directions = new GetDirectionsData(getApplicationContext());
+        dataTransfer[0] = mMap;
+        dataTransfer[1] = sb.toString();
+        dataTransfer[2] = new LatLng(locationM.getPosition().latitude, locationM.getPosition().longitude);
+        dataTransfer[3] = new LatLng(searchM.getPosition().latitude, searchM.getPosition().longitude);
+
+        directions.execute(dataTransfer);
+    }
+
+    public void Findroutes(LatLng Start, LatLng End)
+    {
+        if(Start==null || End==null) {
+            Toast.makeText(MapsActivity.this,"Unable to get location", Toast.LENGTH_LONG).show();
+        }
+        else
+        {
+
+            Routing routing = new Routing.Builder()
+                    .travelMode(AbstractRouting.TravelMode.DRIVING)
+                    .withListener((RoutingListener) this)
+                    .alternativeRoutes(true)
+                    .waypoints(Start, End)
+                    .key("AIzaSyBQO-l2zw_iDe6mbG1HpKPLlOuIYhWRGsY")  //also define your api key here.
+                    .build();
+            routing.execute();
+        }
+    }
+
+    //Routing call back functions.
+    @Override
+    public void onRoutingFailure(RouteException e) {
+        View parentLayout = findViewById(android.R.id.content);
+        Snackbar snackbar= Snackbar.make(parentLayout, e.toString(), Snackbar.LENGTH_LONG);
+        snackbar.show();
+//        Findroutes(start,end);
+    }
+
+    @Override
+    public void onRoutingStart() {
+        Toast.makeText(MapsActivity.this,"Finding Route...",Toast.LENGTH_LONG).show();
+    }
+
+    //If Route finding success..
+    @Override
+    public void onRoutingSuccess(ArrayList<Route> route, int shortestRouteIndex) {
+
+        CameraUpdate center = CameraUpdateFactory.newLatLng(locationM.getPosition());
+        CameraUpdate zoom = CameraUpdateFactory.zoomTo(16);
+        if(polylines!=null) {
+            polylines.clear();
+        }
+        PolylineOptions polyOptions = new PolylineOptions();
+        LatLng polylineStartLatLng=null;
+        LatLng polylineEndLatLng=null;
+
+
+        polylines = new ArrayList<>();
+        //add route(s) to the map using polyline
+        for (int i = 0; i <route.size(); i++) {
+
+            if(i==shortestRouteIndex)
+            {
+                polyOptions.color(Color.BLUE);
+                polyOptions.width(7);
+                polyOptions.addAll(route.get(shortestRouteIndex).getPoints());
+                Polyline polyline = mMap.addPolyline(polyOptions);
+                polylineStartLatLng=polyline.getPoints().get(0);
+                int k=polyline.getPoints().size();
+                polylineEndLatLng=polyline.getPoints().get(k-1);
+                polylines.add(polyline);
+
+            }
+            else {
+
+            }
+
+        }
+
+        //Add Marker on route starting position
+        MarkerOptions startMarker = new MarkerOptions();
+        startMarker.position(polylineStartLatLng);
+        startMarker.title("My Location");
+        mMap.addMarker(startMarker);
+
+        //Add Marker on route ending position
+        MarkerOptions endMarker = new MarkerOptions();
+        endMarker.position(polylineEndLatLng);
+        endMarker.title("Destination");
+        mMap.addMarker(endMarker);
+    }
+
+    @Override
+    public void onRoutingCancelled() {
+        Findroutes(locationM.getPosition(),searchM.getPosition());
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        Findroutes(locationM.getPosition(),searchM.getPosition());
+
     }
 }
