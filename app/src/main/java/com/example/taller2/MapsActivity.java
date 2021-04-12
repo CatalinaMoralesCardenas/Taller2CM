@@ -45,6 +45,7 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MapStyleOptions;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.example.taller2.databinding.ActivityMapsBinding;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -58,6 +59,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private GoogleMap mMap;
     private ActivityMapsBinding binding;
+    private Marker locationM;
+    private Marker searchM;
     FusedLocationProviderClient clientLocation;
     LocationRequest locationRequest;
     LocationCallback locationCallback;
@@ -106,7 +109,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     Log.i(" LOCATION ", "Latitud: " + location.getLatitude());
 
                     LatLng userLocation = new LatLng(location.getLatitude(), location.getLongitude());
-                    mMap.addMarker(new MarkerOptions().position(userLocation).title("Tu Ubicación"));
+                    locationM = mMap.addMarker(new MarkerOptions().position(userLocation).title("Tu Ubicación"));
                     mMap.moveCamera(CameraUpdateFactory.newLatLng(userLocation));
                     mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
 
@@ -132,13 +135,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             if (addresses != null && !addresses.isEmpty()) {
                                 Address addressResult = addresses.get(0);
                                 if (mMap != null) {
+                                    if(searchM != null) {
+                                        searchM.remove();
+                                    }
                                     LatLng location = new LatLng(addressResult.getLatitude(), addressResult.getLongitude());
-                                    mMap.addMarker(new MarkerOptions().
+                                    searchM = mMap.addMarker(new MarkerOptions().
                                             position(location).
                                             title(addressResult.getAddressLine(0)).
                                             icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)));
                                     mMap.moveCamera(CameraUpdateFactory.newLatLng(location));
                                     mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
+
+                                    Double latitude1 = searchM.getPosition().latitude;
+                                    Double latitude2 = locationM.getPosition().latitude;
+                                    Double longitude1 = searchM.getPosition().longitude;
+                                    Double longitude2 = locationM.getPosition().longitude;
+                                    Toast.makeText(MapsActivity.this, "La distancia es: " + distance(latitude1, longitude1, latitude2, longitude2) + " Km", Toast.LENGTH_SHORT).show();
 
                                 }
                             } else {
@@ -200,6 +212,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         mMap.setMapStyle(MapStyleOptions.loadRawResourceStyle(this, R.raw.lightmap));
 
+        mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
+            @Override
+            public void onMapLongClick(LatLng latLng) {
+                if(searchM != null)
+                {
+                    searchM.remove();
+                }
+                searchM=mMap.addMarker(new MarkerOptions().position(latLng).title(geoCoderSearchLatLang(latLng)).icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+                Double latitude1 = searchM.getPosition().latitude;
+                Double latitude2 = locationM.getPosition().latitude;
+                Double longitude1 = searchM.getPosition().longitude;
+                Double longitude2 = locationM.getPosition().longitude;
+                Toast.makeText(MapsActivity.this, "La distancia es: " + distance(latitude1, longitude1, latitude2, longitude2) + " Km", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private LocationRequest createLocationRequest() {
@@ -293,4 +320,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    private String geoCoderSearchLatLang(LatLng latLng) {
+        String finalName="";
+        try {
+            Address name = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1).get(0);
+            finalName = name.getAddressLine(0);
+        }catch (IOException e){
+            e.printStackTrace();
+        }
+        return finalName;
+    }
+
+    public double distance(double lat1, double long1, double lat2, double long2) {
+        double latDistance = Math.toRadians(lat1 - lat2);
+        double lngDistance = Math.toRadians(long1 - long2);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lngDistance / 2) * Math.sin(lngDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double result = 6371 * c;
+        return Math.round(result*100.0)/100.0;
+    }
 }
