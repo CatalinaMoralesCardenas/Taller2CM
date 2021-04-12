@@ -30,6 +30,12 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        camera.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(getBaseContext(), CameraActivity.class));
+            }
+        });
         location.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -38,5 +44,13 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+        location.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                //startActivity(new Intent(getBaseContext(), CameraActivity.class));
+            }
+        });
+
+    }
 
 }

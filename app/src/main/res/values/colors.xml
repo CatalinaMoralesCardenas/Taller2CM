@@ -9,4 +9,5 @@
     <color name="white">#FFFFFFFF</color>
     <color name="denied">#ED0909</color>
     <color name="granted">#8BC34A</color>
+    <color name="aguamarina">#00BCD4</color>
 </resources>
